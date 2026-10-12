@@ -1,50 +1,91 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Bilge Baykuş ile Canlı Sohbet</title>
+
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: #1a1a1a;
+            background: #1a1a1a;
             color: #f0f0f0;
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
         }
+
         .container {
             text-align: center;
             max-width: 500px;
             width: 100%;
-            padding: 20px;
         }
+
         .owl-container {
             position: relative;
             width: 250px;
             height: 250px;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 20px;
             border-radius: 50%;
             overflow: hidden;
             border: 4px solid #d4af37;
             box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+            transition: box-shadow 0.3s ease;
         }
-        .owl-container img {
+
+        #owlImage {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.3s;
+            display: block;
+            transition: transform 0.3s ease, filter 0.3s ease;
         }
-        /* Konuşurken hafif hareket efekti */
+
         .speaking {
             transform: scale(1.05);
-            filter: brightness(1.1);
+            filter: brightness(1.15);
         }
+
+        .owl-container.active {
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.9);
+        }
+
+        h2 {
+            color: #d4af37;
+            margin-bottom: 15px;
+        }
+
+        #status {
+            margin-top: 15px;
+            color: #c8c8c8;
+            min-height: 44px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+
+        #transcript {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #ddd;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+            min-height: 50px;
+        }
+
         button {
-            background-color: #d4af37;
+            background: #d4af37;
             color: #1a1a1a;
             border: none;
             padding: 12px 24px;
@@ -52,114 +93,387 @@
             font-weight: bold;
             border-radius: 25px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.2s;
             margin-top: 15px;
         }
-        button:hover {
-            background-color: #f3c653;
+
+        button:hover:not(:disabled) {
+            background: #f3c653;
+            transform: translateY(-2px);
         }
-        #status {
-            margin-top: 15px;
-            font-style: italic;
-            color: #aaa;
-            min-height: 24px;
+
+        button:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
         }
-        #transcript {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #ddd;
-            background: #2a2a2a;
-            padding: 10px;
-            border-radius: 8px;
+
+        #stopBtn {
+            background: #555;
+            color: white;
+            margin-left: 6px;
+        }
+
+        #stopBtn:hover:not(:disabled) {
+            background: #777;
+        }
+
+        .note {
+            color: #999;
+            font-size: 12px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 400px) {
+            .owl-container {
+                width: 210px;
+                height: 210px;
+            }
+
+            button {
+                padding: 11px 16px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
+
 <body>
 
-    <div class="container">
-        <div class="owl-container">
-            <!-- Baykuş görselini repo içine 'baykus.png' olarak ekleyeceksin -->
-            <img id="owlImage" src="baykus.png" alt="Bilge Baykuş">
+    <main class="container">
+
+        <div class="owl-container" id="owlContainer">
+            <img
+                id="owlImage"
+                src="baykus.png"
+                alt="Bilge Baykuş"
+            >
         </div>
-        
+
         <h2>Bilge Baykuş</h2>
-        <div id="status">Dinlemek için butona bas ve konuşmaya başla...</div>
-        <div id="transcript">Senin sesin: -</div>
-        
-        <button id="listenBtn">🎤 Konuşmaya Başla</button>
-    </div>
+
+        <div id="status" role="status" aria-live="polite">
+            Sohbete başlamak için butona bas.
+        </div>
+
+        <div id="transcript" aria-live="polite">
+            <strong>Senin söylediğin:</strong> Henüz konuşmadın.
+        </div>
+
+        <button id="listenBtn" type="button">
+            🎤 Konuşmaya Başla
+        </button>
+
+        <button id="stopBtn" type="button" disabled>
+            ⏹ Durdur
+        </button>
+
+        <p class="note">
+            Mikrofon izni vermen gerekebilir. En iyi uyumluluk için
+            güncel Google Chrome ve HTTPS bağlantısı kullan.
+        </p>
+
+    </main>
 
     <script>
-        const listenBtn = document.getElementById('listenBtn');
-        const statusDiv = document.getElementById('status');
-        const transcriptDiv = document.getElementById('transcript');
-        const owlImage = document.getElementById('owlImage');
+        "use strict";
 
-        // Tarayıcı Ses Tanıma Desteği (Speech to Text)
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
+        const listenBtn = document.getElementById("listenBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const statusDiv = document.getElementById("status");
+        const transcriptDiv = document.getElementById("transcript");
+        const owlImage = document.getElementById("owlImage");
+        const owlContainer = document.getElementById("owlContainer");
+
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+        let recognition = null;
+        let isListening = false;
+        let isSpeaking = false;
+        let manuallyStopped = false;
+
+        // Tarayıcı ses tanımayı destekliyor mu?
         if (!SpeechRecognition) {
-            alert("Tarayıcınız ses tanıma özelliğini desteklemiyor. Lütfen Google Chrome kullanın.");
+            listenBtn.disabled = true;
+
+            statusDiv.textContent =
+                "Tarayıcın ses tanımayı desteklemiyor. Güncel Google Chrome deneyebilirsin.";
         } else {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'tr-TR';
+            recognition = new SpeechRecognition();
+
+            recognition.lang = "tr-TR";
             recognition.interimResults = false;
+            recognition.continuous = false;
+            recognition.maxAlternatives = 1;
 
-            listenBtn.addEventListener('click', () => {
-                recognition.start();
-                statusDiv.textContent = "Dinliyorum hoca... Kulak kabarttım.";
-            });
+            // Dinlemeyi başlat
+            listenBtn.addEventListener("click", startListening);
 
-            recognition.onresult = async (event) => {
-                const userSpeech = event.results[0][0].transcript;
-                transcriptDiv.textContent = `Senin sesin: "${userSpeech}"`;
-                statusDiv.textContent = "Düşünüyorum...";
+            // Dinlemeyi ve varsa seslendirmeyi durdur
+            stopBtn.addEventListener("click", stopEverything);
 
-                // Baykuşun vereceği akıllı yanıt (Buraya kendi mantığını veya mini API kurallarını ekleyebilirsin)
-                const botResponse = generateOwlResponse(userSpeech);
-                
-                speakResponse(botResponse);
+            recognition.onstart = function () {
+                isListening = true;
+                manuallyStopped = false;
+
+                listenBtn.disabled = true;
+                stopBtn.disabled = false;
+
+                statusDiv.textContent =
+                    "Seni dinliyorum. Buyur, konuşabilirsin.";
             };
 
-            recognition.onerror = (event) => {
-                statusDiv.textContent = "Bir hata oluştu, tekrar dene.";
+            recognition.onresult = async function (event) {
+                const result = event.results[event.resultIndex];
+
+                if (!result || !result[0]) {
+                    statusDiv.textContent =
+                        "Söylediklerini anlayamadım. Tekrar deneyebilirsin.";
+                    return;
+                }
+
+                const userSpeech = result[0].transcript.trim();
+
+                if (!userSpeech) {
+                    statusDiv.textContent =
+                        "Bir şey duyamadım. Tekrar konuşabilirsin.";
+                    return;
+                }
+
+                transcriptDiv.textContent =
+                    "Senin söylediğin: " + userSpeech;
+
+                statusDiv.textContent =
+                    "Düşünüyorum...";
+
+                try {
+                    const botResponse =
+                        await generateOwlResponse(userSpeech);
+
+                    speakResponse(botResponse);
+                } catch (error) {
+                    console.error("Yanıt hatası:", error);
+
+                    statusDiv.textContent =
+                        "Yanıt oluşturulurken bir hata oluştu.";
+                }
+            };
+
+            recognition.onerror = function (event) {
+                console.error("Ses tanıma hatası:", event.error);
+
+                const messages = {
+                    "not-allowed":
+                        "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin ver.",
+                    "service-not-allowed":
+                        "Ses tanıma servisine erişilemiyor.",
+                    "no-speech":
+                        "Ses algılayamadım. Mikrofonuna konuşup tekrar dene.",
+                    "audio-capture":
+                        "Mikrofon bulunamadı veya başka bir uygulama tarafından kullanılıyor.",
+                    "network":
+                        "Ses tanıma sırasında ağ hatası oluştu.",
+                    "aborted":
+                        "Dinleme durduruldu."
+                };
+
+                statusDiv.textContent =
+                    messages[event.error] ||
+                    "Ses tanıma hatası oluştu: " + event.error;
+            };
+
+            recognition.onend = function () {
+                isListening = false;
+
+                listenBtn.disabled = false;
+                stopBtn.disabled = !isSpeaking;
+
+                if (!isSpeaking && !manuallyStopped) {
+                    statusDiv.textContent =
+                        "Dinlemek için butona bas ve konuşmaya başla.";
+                }
             };
         }
 
-        // Baykuşun Bilgece Cevap Üretme Mantığı
-        function generateOwlResponse(text) {
-            text = text.toLowerCase();
-            if (text.includes('merhaba') || text.includes('selam')) {
-                return "Selam olsun yolcu. Kütüphanemin sessizliğini bozup beni hangi rüzgar attı?";
-            } else if (text.includes('nasılsın') || text.includes('ne yapıyorsun')) {
-                return "Kitapların arasında, zamanın akışını izliyorum. Bilgi, en sadık dostumuzdur.";
-            } else if (text.includes('kitap') || text.includes('tarih') || text.includes('ekonomi')) {
-                return "Ah, derin mevzulara girdin. Tarihin tozlu sayfalarında ve ekonominin çarklarında öğrenilecek çok şey var.";
-            } else {
-                return `Şöyle dedin: "${text}". Bilge baykuş olarak üzerime düşeni yapmaya hazırım, bunu biraz daha açar mısın?`;
+        // Dinlemeyi başlat
+        function startListening() {
+            if (!recognition || isListening) {
+                return;
+            }
+
+            // Önceki konuşmayı durdur
+            window.speechSynthesis.cancel();
+
+            isSpeaking = false;
+            manuallyStopped = false;
+
+            owlImage.classList.remove("speaking");
+            owlContainer.classList.remove("active");
+
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error("Dinleme başlatılamadı:", error);
+
+                statusDiv.textContent =
+                    "Dinleme başlatılamadı. Birkaç saniye sonra tekrar dene.";
             }
         }
 
-        // Tarayıcı Ses Sentezleme (Text to Speech) ve Görsel Animasyonu
-        function speakResponse(text) {
-            statusDiv.textContent = text;
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'tr-TR';
-            utterance.pitch = 0.6; // Baykuş için daha kalın/tok ses tonu
-            utterance.rate = 0.9;  // Biraz daha ağırbaşlı, yavaş konuşma hızı
+        // Her şeyi durdur
+        function stopEverything() {
+            manuallyStopped = true;
 
-            // Konuşurken baykuş görseline hareket ekleme
-            utterance.onstart = () => {
-                owlImage.classList.add('speaking');
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+
+            window.speechSynthesis.cancel();
+
+            isSpeaking = false;
+            isListening = false;
+
+            owlImage.classList.remove("speaking");
+            owlContainer.classList.remove("active");
+
+            listenBtn.disabled = !recognition;
+            stopBtn.disabled = true;
+
+            statusDiv.textContent =
+                "Sohbet durduruldu. Devam etmek için butona bas.";
+        }
+
+        // Bilge Baykuşun örnek yanıt sistemi
+        // Bu sürüm gerçek bir yapay zekâ API'si kullanmaz.
+        async function generateOwlResponse(text) {
+            const message = text.toLocaleLowerCase("tr-TR");
+
+            if (
+                message.includes("merhaba") ||
+                message.includes("selam")
+            ) {
+                return "Selam olsun yolcu! Kütüphanemin sessizliğini bozup beni hangi rüzgâr attı?";
+            }
+
+            if (
+                message.includes("nasılsın") ||
+                message.includes("ne yapıyorsun")
+            ) {
+                return "Kitapların arasında, zamanın akışını izliyorum. Bilgi, en sadık dostumuzdur.";
+            }
+
+            if (
+                message.includes("kitap") ||
+                message.includes("tarih") ||
+                message.includes("ekonomi")
+            ) {
+                return "Ah, derin mevzulara girdin! Tarihin tozlu sayfalarında ve ekonominin çarklarında öğrenilecek çok şey var. Hangi konuyu inceleyelim?";
+            }
+
+            if (
+                message.includes("adın ne") ||
+                message.includes("kimsin")
+            ) {
+                return "Ben Bilge Baykuş! Bilginin peşinde uçan, sorulara cevap arayan bir dostunum.";
+            }
+
+            if (
+                message.includes("teşekkür") ||
+                message.includes("sağ ol")
+            ) {
+                return "Bilgi paylaştıkça çoğalır dostum. Ne zaman istersen buradayım.";
+            }
+
+            if (
+                message.includes("görüşürüz") ||
+                message.includes("hoşça kal")
+            ) {
+                return "Yolun açık olsun yolcu! Unutma, öğrenmenin sonu yoktur.";
+            }
+
+            return "Şöyle dedin: " + text +
+                ". İlginç bir konu! Bunu biraz daha açar mısın? Birlikte düşünelim.";
+        }
+
+        // Baykuşun sesli yanıtı
+        function speakResponse(text) {
+            if (!("speechSynthesis" in window)) {
+                statusDiv.textContent =
+                    text + " (Tarayıcın sesli yanıtı desteklemiyor.)";
+                return;
+            }
+
+            // Önceki seslendirmeyi temizle
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            utterance.lang = "tr-TR";
+            utterance.pitch = 0.7;
+            utterance.rate = 0.9;
+            utterance.volume = 1;
+
+            // Varsa Türkçe ses seç
+            const voices = window.speechSynthesis.getVoices();
+
+            const turkishVoice = voices.find(function (voice) {
+                return voice.lang.toLowerCase().startsWith("tr");
+            });
+
+            if (turkishVoice) {
+                utterance.voice = turkishVoice;
+            }
+
+            utterance.onstart = function () {
+                isSpeaking = true;
+
+                owlImage.classList.add("speaking");
+                owlContainer.classList.add("active");
+
+                stopBtn.disabled = false;
+                statusDiv.textContent = text;
             };
 
-            utterance.onend = () => {
-                owlImage.classList.remove('speaking');
-                statusDiv.textContent = "Dinlemek için butona bas ve konuşmaya başla...";
+            utterance.onend = function () {
+                isSpeaking = false;
+
+                owlImage.classList.remove("speaking");
+                owlContainer.classList.remove("active");
+
+                stopBtn.disabled = !isListening;
+
+                if (!isListening) {
+                    statusDiv.textContent =
+                        "Dinlemek için butona bas ve konuşmaya başla.";
+                }
+            };
+
+            utterance.onerror = function (event) {
+                console.error("Seslendirme hatası:", event.error);
+
+                isSpeaking = false;
+
+                owlImage.classList.remove("speaking");
+                owlContainer.classList.remove("active");
+
+                stopBtn.disabled = !isListening;
+
+                statusDiv.textContent =
+                    text + " (Sesli yanıt verilemedi.)";
             };
 
             window.speechSynthesis.speak(utterance);
         }
+
+        // Bazı tarayıcılarda ses listesi gecikmeli yüklenir.
+        if ("speechSynthesis" in window) {
+            window.speechSynthesis.onvoiceschanged = function () {
+                window.speechSynthesis.getVoices();
+            };
+        }
     </script>
+
 </body>
 </html>

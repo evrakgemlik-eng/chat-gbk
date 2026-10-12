@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilge Baykuş ile Canlı Sohbet</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+        }
+        .owl-container {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin: 0 auto 20px auto;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid #d4af37;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+        }
+        .owl-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+        /* Konuşurken hafif hareket efekti */
+        .speaking {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+        button {
+            background-color: #d4af37;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 15px;
+        }
+        button:hover {
+            background-color: #f3c653;
+        }
+        #status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #aaa;
+            min-height: 24px;
+        }
+        #transcript {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #ddd;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="owl-container">
+            <!-- Baykuş görselini repo içine 'baykus.png' olarak ekleyeceksin -->
+            <img id="owlImage" src="baykus.png" alt="Bilge Baykuş">
+        </div>
+        
+        <h2>Bilge Baykuş</h2>
+        <div id="status">Dinlemek için butona bas ve konuşmaya başla...</div>
+        <div id="transcript">Senin sesin: -</div>
+        
+        <button id="listenBtn">🎤 Konuşmaya Başla</button>
+    </div>
+
+    <script>
+        const listenBtn = document.getElementById('listenBtn');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+        const owlImage = document.getElementById('owlImage');
+
+        // Tarayıcı Ses Tanıma Desteği (Speech to Text)
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            alert("Tarayıcınız ses tanıma özelliğini desteklemiyor. Lütfen Google Chrome kullanın.");
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'tr-TR';
+            recognition.interimResults = false;
+
+            listenBtn.addEventListener('click', () => {
+                recognition.start();
+                statusDiv.textContent = "Dinliyorum hoca... Kulak kabarttım.";
+            });
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                transcriptDiv.textContent = `Senin sesin: "${userSpeech}"`;
+                statusDiv.textContent = "Düşünüyorum...";
+
+                // Baykuşun vereceği akıllı yanıt (Buraya kendi mantığını veya mini API kurallarını ekleyebilirsin)
+                const botResponse = generateOwlResponse(userSpeech);
+                
+                speakResponse(botResponse);
+            };
+
+            recognition.onerror = (event) => {
+                statusDiv.textContent = "Bir hata oluştu, tekrar dene.";
+            };
+        }
+
+        // Baykuşun Bilgece Cevap Üretme Mantığı
+        function generateOwlResponse(text) {
+            text = text.toLowerCase();
+            if (text.includes('merhaba') || text.includes('selam')) {
+                return "Selam olsun yolcu. Kütüphanemin sessizliğini bozup beni hangi rüzgar attı?";
+            } else if (text.includes('nasılsın') || text.includes('ne yapıyorsun')) {
+                return "Kitapların arasında, zamanın akışını izliyorum. Bilgi, en sadık dostumuzdur.";
+            } else if (text.includes('kitap') || text.includes('tarih') || text.includes('ekonomi')) {
+                return "Ah, derin mevzulara girdin. Tarihin tozlu sayfalarında ve ekonominin çarklarında öğrenilecek çok şey var.";
+            } else {
+                return `Şöyle dedin: "${text}". Bilge baykuş olarak üzerime düşeni yapmaya hazırım, bunu biraz daha açar mısın?`;
+            }
+        }
+
+        // Tarayıcı Ses Sentezleme (Text to Speech) ve Görsel Animasyonu
+        function speakResponse(text) {
+            statusDiv.textContent = text;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'tr-TR';
+            utterance.pitch = 0.6; // Baykuş için daha kalın/tok ses tonu
+            utterance.rate = 0.9;  // Biraz daha ağırbaşlı, yavaş konuşma hızı
+
+            // Konuşurken baykuş görseline hareket ekleme
+            utterance.onstart = () => {
+                owlImage.classList.add('speaking');
+            };
+
+            utterance.onend = () => {
+                owlImage.classList.remove('speaking');
+                statusDiv.textContent = "Dinlemek için butona bas ve konuşmaya başla...";
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
